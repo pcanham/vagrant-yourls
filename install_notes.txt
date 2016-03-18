@@ -1,0 +1,37 @@
+## installing software dependencies
+yum -y install vim wget httpd php php-mysql mariadb-server
+systemctl start mariadb
+
+## Create database
+cat > /tmp/yourls-mysql.sql<<!
+create user 'yourls'@'localhost' IDENTIFIED BY 'yourlspass';
+create database yourls;
+GRANT ALL PRIVILEGES ON yourls.* TO 'yourls'@'localhost' WITH GRANT OPTION;
+!
+mysql -uroot < /tmp/yourls-mysql.sql
+
+## Download application and extract
+mkdir /opt/src
+cd /opt/src
+wget https://github.com/YOURLS/YOURLS/archive/1.7.tar.gz -O /opt/src/yourls-1.7.tar.gz
+tar xvfz /opt/src/yourls-1.7.tar.gz -C /var/www/
+mv /var/www/html{,-old}
+mv /var/www/YOURLS-1.7 /var/www/html
+
+## Configure application
+cp /var/www/html/user/config-sample.php /var/www/html/user/config.php
+
+## Setup config file for working
+sed -i "s/your db user name/yourls/g" /var/www/html/user/config.php
+sed -i "s/your db password/yourlspass/g" /var/www/html/user/config.php
+sed -i "s/http:\/\/site.com/http:\/\/10.0.0.20/g" /var/www/html/user/config.php
+sed -i "s/'YOURLS_UNIQUE_URLS', true/'YOURLS_UNIQUE_URLS', false/g" /var/www/html/user/config.php
+randomtext=`date +%s | sha256sum | base64 | head -c 32`
+sed -i "s/'YOURLS_COOKIEKEY', 'modify this text with something random'/'YOURLS_COOKIEKEY', '$randomtext'/g" /var/www/html/user/config.php
+
+chown -R apache:apache /var/www/html
+rm -f /etc/httpd/conf.d/welcome.conf
+systemctl restart httpd
+
+## Installing app
+http://10.0.0.20/yourls/admin/install.php
